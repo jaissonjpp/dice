@@ -11,7 +11,7 @@
 
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 
 <body>
@@ -33,11 +33,11 @@
             <input type="checkbox" id="vampire-toggle">
             <span class="toggle-slider"></span>
           </label>
-          <span class="vampire-toggle-label">Modo Vampiro</span>
+          <label for="vampire-toggle" class="vampire-toggle-label">Modo Vampiro</label>
         </div>
         <div class="difficulty-group hidden" id="difficulty-group">
-          <label class="difficulty-label" for="difficulty-input">Dificuldade</label>
-          <div class="difficulty-controls">
+          <span class="difficulty-label" id="difficulty-label">Dificuldade</span>
+          <div class="difficulty-controls" role="spinbutton" aria-labelledby="difficulty-label" aria-valuenow="6" aria-valuemin="2" aria-valuemax="10">
             <button class="diff-btn" id="diff-down" type="button" aria-label="Diminuir dificuldade">−</button>
             <span class="difficulty-value" id="difficulty-value">6</span>
             <button class="diff-btn" id="diff-up" type="button" aria-label="Aumentar dificuldade">+</button>
@@ -95,6 +95,13 @@
         </div>
       </section>
 
+      <!-- Preset Save Inline Input -->
+      <div class="preset-save-inline hidden" id="preset-save-container">
+        <input type="text" class="preset-name-input" id="preset-name-input" placeholder="Nome do favorito..." maxlength="30">
+        <button class="preset-confirm-btn" id="preset-confirm-btn" type="button" title="Salvar">✓</button>
+        <button class="preset-cancel-btn" id="preset-cancel-btn" type="button" title="Cancelar">✕</button>
+      </div>
+
       <!-- Presets / Favorites -->
       <section class="section presets-section hidden" id="presets-section">
         <h2 class="section-title">Favoritos</h2>
@@ -143,7 +150,12 @@
 
   </div>
 
-  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(r => r.forEach(reg => reg.unregister()));
+    }
+  </script>
+  <script src="app.js?v=3"></script>
 </body>
 
 </html>

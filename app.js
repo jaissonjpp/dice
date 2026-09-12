@@ -282,9 +282,36 @@
     $rollBtn.disabled = dicePool.size === 0;
   }
 
-  // ── Rolling Logic ──────────────────────────────────────────────────────
+  // ── Rolling Logic (Cryptographically Fair CSPRNG) ──────────────────────
 
+  /**
+   * Cryptographically secure, perfectly uniform random number generator.
+   * Uses Web Crypto API (crypto.getRandomValues) with rejection sampling
+   * to eliminate modulo bias completely.
+   *
+   * @param {number} sides - Number of sides on the die (e.g. 4, 6, 8, 10, 12, 20, 100)
+   * @returns {number} Integer between 1 and sides (inclusive)
+   */
   function rollDie(sides) {
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+      // 32-bit unsigned integer max value: 0xFFFFFFFF (4,294,967,295)
+      const maxUint32 = 0xFFFFFFFF;
+      // Largest multiple of sides that fits into 32 bits
+      const limit = maxUint32 - (maxUint32 % sides);
+      const buffer = new Uint32Array(1);
+      let rand;
+
+      // Rejection sampling: discard numbers in the remaining modulo tail
+      // This guarantees every face has the exact identical mathematical probability
+      do {
+        window.crypto.getRandomValues(buffer);
+        rand = buffer[0];
+      } while (rand >= limit);
+
+      return (rand % sides) + 1;
+    }
+
+    // Graceful fallback if Web Crypto is unavailable
     return Math.floor(Math.random() * sides) + 1;
   }
 
@@ -378,36 +405,40 @@
   // ── Vampire Result Calculation ─────────────────────────────────────────
 
   function calculateVampireResult(results) {
-    let successes = 0;
+    let rawSuccesses = 0;
     let ones = 0;
     let tens = 0;
 
     results.forEach(r => {
       if (r.value === 10) {
-        successes++;
+        rawSuccesses++;
         tens++;
       } else if (r.value >= difficulty) {
-        successes++;
+        rawSuccesses++;
       } else if (r.value === 1) {
         ones++;
       }
     });
 
-    // Ones cancel successes
-    const netSuccesses = successes - ones;
+    // In Storyteller rules:
+    // 1s cancel successes 1-for-1
+    const netSuccesses = rawSuccesses - ones;
 
-    // Determine result type
+    // Regra Oficial Storyteller (V20 / Clássico):
+    // - Sucesso: netSuccesses > 0
+    // - Falha Crítica (Botch): NENHUM sucesso obtido (rawSuccesses === 0) E pelo menos um 1 rolado (ones > 0)
+    // - Falha Simples: netSuccesses <= 0, mas pelo menos um sucesso foi obtido inicialmente, OU nenhum sucesso e nenhum 1
     let type;
     if (netSuccesses > 0) {
       type = 'success';
-    } else if (netSuccesses < 0 || (successes === 0 && ones > 0)) {
+    } else if (rawSuccesses === 0 && ones > 0) {
       type = 'critical-failure';
     } else {
       type = 'failure';
     }
 
     return {
-      successes,
+      successes: rawSuccesses,
       ones,
       tens,
       net: Math.max(0, netSuccesses),

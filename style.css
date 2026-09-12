@@ -811,3 +811,428 @@ body {
   background: var(--red-primary);
   color: var(--text-primary);
 }
+
+/* ============================================
+   VAMPIRE MODE
+   ============================================ */
+
+/* --- Vampire Mode Bar --- */
+.vampire-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.vampire-toggle-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.vampire-toggle-label {
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: color var(--transition-base);
+}
+
+.vampire-mode-bar.active .vampire-toggle-label {
+  color: var(--red-crimson);
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 24px;
+  transition: all var(--transition-base);
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 2px;
+  bottom: 2px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  transition: all var(--transition-base);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--red-dark);
+  border-color: var(--red-crimson);
+  box-shadow: 0 0 12px rgba(220, 20, 60, 0.3);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+  background: var(--red-crimson);
+}
+
+/* Difficulty Controls */
+.difficulty-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  animation: fadeUp 300ms ease forwards;
+}
+
+.difficulty-label {
+  font-family: var(--font-heading);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.difficulty-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.diff-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font-body);
+}
+
+.diff-btn:hover {
+  border-color: var(--red-crimson);
+  color: var(--red-crimson);
+}
+
+.difficulty-value {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: var(--red-crimson);
+  min-width: 28px;
+  text-align: center;
+}
+
+/* Disabled dice buttons in Vampire Mode */
+.dice-btn.disabled-vampire {
+  opacity: 0.2;
+  pointer-events: none;
+  filter: grayscale(1);
+}
+
+/* --- Vampire Result States --- */
+.result-die.is-success {
+  border-color: #2ecc71;
+  box-shadow: 0 0 12px rgba(46, 204, 113, 0.2);
+}
+
+.result-die.is-success .result-value {
+  color: #2ecc71;
+}
+
+.result-die.is-special-success {
+  border-color: var(--gold-primary);
+  box-shadow: var(--shadow-glow-gold);
+}
+
+.result-die.is-special-success .result-value {
+  color: var(--gold-primary);
+}
+
+.result-die.is-botch {
+  border-color: var(--red-crimson);
+  box-shadow: 0 0 15px rgba(220, 20, 60, 0.25);
+}
+
+.result-die.is-botch .result-value {
+  color: var(--red-crimson);
+}
+
+/* Vampire Summary */
+.vampire-summary {
+  text-align: center;
+  padding: var(--space-lg) 0 var(--space-sm);
+  animation: fadeUp 500ms ease forwards;
+}
+
+.vampire-summary-value {
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+}
+
+.vampire-summary-value.success {
+  color: #2ecc71;
+  text-shadow: 0 0 20px rgba(46, 204, 113, 0.3);
+}
+
+.vampire-summary-value.failure {
+  color: var(--text-muted);
+}
+
+.vampire-summary-value.critical-failure {
+  color: var(--red-crimson);
+  text-shadow: 0 0 30px rgba(220, 20, 60, 0.5);
+  animation: criticalPulse 600ms ease-in-out 3;
+}
+
+.vampire-summary-detail {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: var(--space-xs);
+}
+
+@keyframes criticalPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.7; transform: scale(1.05); }
+}
+
+/* Screen shake for critical failure */
+@keyframes screenShake {
+  0%, 100% { transform: translateX(0); }
+  10%      { transform: translateX(-4px); }
+  20%      { transform: translateX(4px); }
+  30%      { transform: translateX(-3px); }
+  40%      { transform: translateX(3px); }
+  50%      { transform: translateX(-2px); }
+  60%      { transform: translateX(2px); }
+  70%      { transform: translateX(-1px); }
+  80%      { transform: translateX(1px); }
+}
+
+.app-layout.screen-shake {
+  animation: screenShake 500ms ease-in-out;
+}
+
+/* ============================================
+   PRESETS / FAVORITES
+   ============================================ */
+
+.pool-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+}
+
+.pool-header .section-title {
+  margin-bottom: 0;
+}
+
+.save-preset-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: none;
+  border: 1px solid var(--gold-dark);
+  border-radius: var(--radius-sm);
+  color: var(--gold-primary);
+  font-family: var(--font-heading);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: var(--space-xs) var(--space-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.save-preset-btn:hover {
+  background: var(--gold-glow);
+  border-color: var(--gold-primary);
+  box-shadow: var(--shadow-glow-gold);
+}
+
+.presets-section {
+  margin-bottom: var(--space-md) !important;
+}
+
+.presets-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.preset-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  animation: fadeUp 300ms ease forwards;
+}
+
+.preset-chip:hover {
+  border-color: var(--gold-primary);
+  background: var(--bg-card-hover);
+  box-shadow: var(--shadow-glow-gold);
+}
+
+.preset-chip-name {
+  font-family: var(--font-heading);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.03em;
+}
+
+.preset-chip-dice {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+}
+
+.preset-chip-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  padding: 0;
+  line-height: 1;
+}
+
+.preset-chip-delete:hover {
+  color: var(--red-crimson);
+  background: rgba(220, 20, 60, 0.15);
+}
+
+/* Preset save inline input */
+.preset-save-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-card);
+  border: 1px solid var(--gold-dark);
+  border-radius: var(--radius-md);
+  animation: fadeUp 200ms ease forwards;
+}
+
+.preset-name-input {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.preset-name-input:focus {
+  border-color: var(--gold-primary);
+}
+
+.preset-name-input::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.preset-confirm-btn,
+.preset-cancel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.preset-confirm-btn:hover {
+  border-color: #2ecc71;
+  color: #2ecc71;
+}
+
+.preset-cancel-btn:hover {
+  border-color: var(--red-crimson);
+  color: var(--red-crimson);
+}
+
+/* History entry vampire mode indicator */
+.entry-vampire-result {
+  font-family: var(--font-heading);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.entry-vampire-result.success {
+  color: #2ecc71;
+}
+
+.entry-vampire-result.failure {
+  color: var(--text-muted);
+}
+
+.entry-vampire-result.critical-failure {
+  color: var(--red-crimson);
+}
+
+/* Responsive adjustments for new elements */
+@media (max-width: 700px) {
+  .vampire-mode-bar {
+    flex-direction: column;
+    gap: var(--space-sm);
+    align-items: flex-start;
+  }
+
+  .preset-chip-name {
+    font-size: 0.65rem;
+  }
+}

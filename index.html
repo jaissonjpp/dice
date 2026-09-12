@@ -1,16 +1,19 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Rolador de dados com tema gótico. Escolha seus dados, role e veja os resultados com estilo.">
+  <meta name="description" content="Rolador de dados">
   <meta name="theme-color" content="#07060b">
 
   <title>Rolador de Dados</title>
 
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
   <!-- Atmospheric Background -->
@@ -22,6 +25,25 @@
 
     <!-- LEFT: Main content -->
     <main class="main-panel">
+
+      <!-- Vampire Mode Toggle -->
+      <section class="vampire-mode-bar" id="vampire-mode-bar">
+        <div class="vampire-toggle-group">
+          <label class="toggle-switch" for="vampire-toggle">
+            <input type="checkbox" id="vampire-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="vampire-toggle-label">Modo Vampiro</span>
+        </div>
+        <div class="difficulty-group hidden" id="difficulty-group">
+          <label class="difficulty-label" for="difficulty-input">Dificuldade</label>
+          <div class="difficulty-controls">
+            <button class="diff-btn" id="diff-down" type="button" aria-label="Diminuir dificuldade">−</button>
+            <span class="difficulty-value" id="difficulty-value">6</span>
+            <button class="diff-btn" id="diff-up" type="button" aria-label="Aumentar dificuldade">+</button>
+          </div>
+        </div>
+      </section>
 
       <!-- Dice Selector -->
       <section class="section" id="dice-selector-section">
@@ -60,12 +82,23 @@
 
       <!-- Dice Pool -->
       <section class="section" id="pool-section">
-        <h2 class="section-title">Seus dados</h2>
+        <div class="pool-header">
+          <h2 class="section-title">Seus dados</h2>
+          <button class="save-preset-btn hidden" id="save-preset-btn" type="button" title="Salvar como favorito">
+            ★ Salvar
+          </button>
+        </div>
         <div class="dice-pool" id="dice-pool">
           <div class="dice-pool-empty" id="pool-empty">
             Toque em um dado acima para adicioná-lo
           </div>
         </div>
+      </section>
+
+      <!-- Presets / Favorites -->
+      <section class="section presets-section hidden" id="presets-section">
+        <h2 class="section-title">Favoritos</h2>
+        <div class="presets-list" id="presets-list"></div>
       </section>
 
       <!-- Roll Button -->
@@ -79,6 +112,11 @@
       <section class="section results-section" id="results-section">
         <h2 class="section-title results-title hidden" id="results-title">Resultados</h2>
         <div class="results-grid" id="results-grid"></div>
+        <!-- Vampire Mode summary (successes/failures) -->
+        <div class="vampire-summary hidden" id="vampire-summary">
+          <div class="vampire-summary-value" id="vampire-summary-value"></div>
+          <div class="vampire-summary-detail" id="vampire-summary-detail"></div>
+        </div>
       </section>
 
     </main>
@@ -107,4 +145,5 @@
 
   <script src="app.js"></script>
 </body>
+
 </html>

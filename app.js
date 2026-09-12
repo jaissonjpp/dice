@@ -1,6 +1,6 @@
 /**
  * Rolador de Dados — Gothic Theme
- * Core application logic: dice pool management, rolling, animations, and history.
+ * Core application logic: dice pool, rolling, vampire mode, presets, and history.
  */
 
 (function () {
@@ -20,39 +20,64 @@
 
   const MAX_DICE_PER_TYPE = 20;
   const MAX_HISTORY = 100;
-  const ROLL_ANIMATION_DURATION = 600; // ms
-  const ROLL_ANIMATION_INTERVAL = 50;  // ms between number changes
-  const STORAGE_KEY = 'dice-roller-history';
+  const MAX_PRESETS = 20;
+  const ROLL_ANIMATION_DURATION = 600;
+  const ROLL_ANIMATION_INTERVAL = 50;
+  const STORAGE_HISTORY = 'dice-roller-history';
+  const STORAGE_PRESETS = 'dice-roller-presets';
 
   // ── State ──────────────────────────────────────────────────────────────
 
   /** @type {Map<string, number>} die type → quantity */
   const dicePool = new Map();
 
-  /** @type {Array<{timestamp: number, pool: Object, results: Array}>} */
+  /** @type {Array<Object>} */
   let history = [];
 
+  /** @type {Array<{name: string, pool: Object, vampireMode: boolean, difficulty: number}>} */
+  let presets = [];
+
   let isRolling = false;
+  let vampireMode = false;
+  let difficulty = 6;
 
   // ── DOM References ─────────────────────────────────────────────────────
 
-  const $diceGrid       = document.getElementById('dice-grid');
-  const $dicePool       = document.getElementById('dice-pool');
-  const $poolEmpty      = document.getElementById('pool-empty');
-  const $rollBtn        = document.getElementById('roll-btn');
-  const $resultsGrid    = document.getElementById('results-grid');
-  const $resultsTitle   = document.getElementById('results-title');
-  const $historyClear   = document.getElementById('history-clear');
-  const $historyList    = document.getElementById('history-list');
-  const $historyEmpty   = document.getElementById('history-empty');
-  const $historyPanel   = document.getElementById('history-panel');
-  const $mobileToggle   = document.getElementById('history-mobile-toggle');
+  const $appLayout       = document.querySelector('.app-layout');
+  const $diceGrid        = document.getElementById('dice-grid');
+  const $dicePool        = document.getElementById('dice-pool');
+  const $poolEmpty       = document.getElementById('pool-empty');
+  const $rollBtn         = document.getElementById('roll-btn');
+  const $resultsGrid     = document.getElementById('results-grid');
+  const $resultsTitle    = document.getElementById('results-title');
+  const $historyClear    = document.getElementById('history-clear');
+  const $historyList     = document.getElementById('history-list');
+  const $historyPanel    = document.getElementById('history-panel');
+  const $mobileToggle    = document.getElementById('history-mobile-toggle');
+
+  // Vampire Mode
+  const $vampireToggle   = document.getElementById('vampire-toggle');
+  const $vampireModeBar  = document.getElementById('vampire-mode-bar');
+  const $difficultyGroup = document.getElementById('difficulty-group');
+  const $difficultyValue = document.getElementById('difficulty-value');
+  const $diffUp          = document.getElementById('diff-up');
+  const $diffDown        = document.getElementById('diff-down');
+  const $vampireSummary  = document.getElementById('vampire-summary');
+  const $vampireSumVal   = document.getElementById('vampire-summary-value');
+  const $vampireSumDet   = document.getElementById('vampire-summary-detail');
+
+  // Presets
+  const $savePresetBtn   = document.getElementById('save-preset-btn');
+  const $presetsSection  = document.getElementById('presets-section');
+  const $presetsList     = document.getElementById('presets-list');
 
   // ── Initialization ─────────────────────────────────────────────────────
 
   function init() {
     loadHistory();
+    loadPresets();
     renderHistory();
+    renderPresets();
     bindEvents();
   }
 
@@ -62,10 +87,8 @@
     // Dice selector buttons
     $diceGrid.addEventListener('click', (e) => {
       const btn = e.target.closest('.dice-btn');
-      if (!btn || isRolling) return;
-
-      const die = btn.dataset.die;
-      addDie(die);
+      if (!btn || isRolling || btn.classList.contains('disabled-vampire')) return;
+      addDie(btn.dataset.die);
       createRipple(btn, e);
     });
 
@@ -75,28 +98,58 @@
       rollAllDice();
     });
 
-    // History clear
+    // History
     $historyClear.addEventListener('click', clearHistory);
-
-    // Mobile history toggle
     $mobileToggle.addEventListener('click', toggleMobileHistory);
 
-    // Pool delegation (quantity buttons + remove)
+    // Pool delegation
     $dicePool.addEventListener('click', (e) => {
       if (isRolling) return;
-
       const target = e.target.closest('[data-action]');
       if (!target) return;
-
       const die = target.dataset.die;
       const action = target.dataset.action;
+      if (action === 'increment') incrementDie(die);
+      else if (action === 'decrement') decrementDie(die);
+      else if (action === 'remove') removeDie(die);
+    });
 
-      if (action === 'increment') {
-        incrementDie(die);
-      } else if (action === 'decrement') {
-        decrementDie(die);
-      } else if (action === 'remove') {
-        removeDie(die);
+    // Vampire Mode toggle
+    $vampireToggle.addEventListener('change', () => {
+      vampireMode = $vampireToggle.checked;
+      applyVampireMode();
+    });
+
+    // Difficulty controls
+    $diffUp.addEventListener('click', () => {
+      if (difficulty < 10) {
+        difficulty++;
+        $difficultyValue.textContent = difficulty;
+      }
+    });
+    $diffDown.addEventListener('click', () => {
+      if (difficulty > 2) {
+        difficulty--;
+        $difficultyValue.textContent = difficulty;
+      }
+    });
+
+    // Save preset
+    $savePresetBtn.addEventListener('click', showPresetSaveInput);
+
+    // Presets list delegation
+    $presetsList.addEventListener('click', (e) => {
+      if (isRolling) return;
+      const delBtn = e.target.closest('.preset-chip-delete');
+      if (delBtn) {
+        e.stopPropagation();
+        const index = parseInt(delBtn.dataset.index);
+        deletePreset(index);
+        return;
+      }
+      const chip = e.target.closest('.preset-chip');
+      if (chip) {
+        loadPreset(parseInt(chip.dataset.index));
       }
     });
 
@@ -112,14 +165,46 @@
     });
   }
 
+  // ── Vampire Mode ───────────────────────────────────────────────────────
+
+  function applyVampireMode() {
+    // Toggle bar active state
+    $vampireModeBar.classList.toggle('active', vampireMode);
+
+    // Show/hide difficulty
+    $difficultyGroup.classList.toggle('hidden', !vampireMode);
+
+    // Disable/enable non-d10 dice
+    document.querySelectorAll('.dice-btn').forEach(btn => {
+      if (btn.dataset.die !== 'd10') {
+        btn.classList.toggle('disabled-vampire', vampireMode);
+      }
+    });
+
+    // If vampire mode on, clear non-d10 from pool
+    if (vampireMode) {
+      const nonD10 = [];
+      for (const [type] of dicePool) {
+        if (type !== 'd10') nonD10.push(type);
+      }
+      nonD10.forEach(t => dicePool.delete(t));
+      renderPool();
+      updateRollButton();
+    }
+
+    // Clear results
+    $resultsGrid.innerHTML = '';
+    $resultsTitle.classList.add('hidden');
+    $vampireSummary.classList.add('hidden');
+  }
+
   // ── Dice Pool Management ───────────────────────────────────────────────
 
   function addDie(type) {
     if (!DICE_TYPES[type]) return;
-
+    if (vampireMode && type !== 'd10') return;
     const current = dicePool.get(type) || 0;
     if (current >= MAX_DICE_PER_TYPE) return;
-
     dicePool.set(type, current + 1);
     renderPool();
     updateRollButton();
@@ -134,10 +219,7 @@
 
   function decrementDie(type) {
     const current = dicePool.get(type) || 0;
-    if (current <= 1) {
-      removeDie(type);
-      return;
-    }
+    if (current <= 1) { removeDie(type); return; }
     dicePool.set(type, current - 1);
     renderPool();
   }
@@ -153,17 +235,17 @@
   function renderPool() {
     if (dicePool.size === 0) {
       $poolEmpty.classList.remove('hidden');
+      $savePresetBtn.classList.add('hidden');
       $dicePool.querySelectorAll('.pool-item').forEach(el => el.remove());
       updateRollButton();
       return;
     }
 
     $poolEmpty.classList.add('hidden');
+    $savePresetBtn.classList.remove('hidden');
 
-    // Build desired order (same as DICE_TYPES keys)
     const orderedTypes = Object.keys(DICE_TYPES).filter(t => dicePool.has(t));
 
-    // Remove items not in pool anymore
     $dicePool.querySelectorAll('.pool-item').forEach(el => {
       if (!dicePool.has(el.dataset.die)) el.remove();
     });
@@ -174,10 +256,8 @@
       let el = $dicePool.querySelector(`.pool-item[data-die="${type}"]`);
 
       if (el) {
-        // Update quantity only
         el.querySelector('.qty-value').textContent = qty;
       } else {
-        // Create new item
         el = document.createElement('div');
         el.className = 'pool-item';
         el.dataset.die = type;
@@ -194,7 +274,6 @@
         $dicePool.appendChild(el);
       }
 
-      // Update name text
       el.querySelector('.pool-item-name').textContent = `${qty}× ${info.label}`;
     });
   }
@@ -217,6 +296,7 @@
     $rollBtn.disabled = true;
     $resultsGrid.innerHTML = '';
     $resultsTitle.classList.remove('hidden');
+    $vampireSummary.classList.add('hidden');
 
     // Build flat array of dice to roll
     const diceToRoll = [];
@@ -247,7 +327,6 @@
       }, ROLL_ANIMATION_INTERVAL);
     });
 
-    // Wait for animation
     await delay(ROLL_ANIMATION_DURATION);
 
     // Final results
@@ -261,16 +340,34 @@
       valueEl.textContent = value;
       el.classList.remove('rolling-anim');
 
-      // Highlight max and 1
-      if (value === die.sides) {
-        el.classList.add('is-max');
-      } else if (value === 1) {
-        el.classList.add('is-one');
+      if (vampireMode) {
+        // Vampire mode coloring
+        if (value === 10) {
+          el.classList.add('is-special-success');
+        } else if (value >= difficulty) {
+          el.classList.add('is-success');
+        } else if (value === 1) {
+          el.classList.add('is-botch');
+        }
+      } else {
+        // Normal mode coloring
+        if (value === die.sides) {
+          el.classList.add('is-max');
+        } else if (value === 1) {
+          el.classList.add('is-one');
+        }
       }
     });
 
+    // Vampire mode: calculate successes
+    let vampireResult = null;
+    if (vampireMode) {
+      vampireResult = calculateVampireResult(results);
+      showVampireSummary(vampireResult);
+    }
+
     // Save to history
-    saveRoll(results);
+    saveRoll(results, vampireResult);
 
     // Reset button
     $rollBtn.classList.remove('rolling');
@@ -278,9 +375,215 @@
     isRolling = false;
   }
 
+  // ── Vampire Result Calculation ─────────────────────────────────────────
+
+  function calculateVampireResult(results) {
+    let successes = 0;
+    let ones = 0;
+    let tens = 0;
+
+    results.forEach(r => {
+      if (r.value === 10) {
+        successes++;
+        tens++;
+      } else if (r.value >= difficulty) {
+        successes++;
+      } else if (r.value === 1) {
+        ones++;
+      }
+    });
+
+    // Ones cancel successes
+    const netSuccesses = successes - ones;
+
+    // Determine result type
+    let type;
+    if (netSuccesses > 0) {
+      type = 'success';
+    } else if (netSuccesses < 0 || (successes === 0 && ones > 0)) {
+      type = 'critical-failure';
+    } else {
+      type = 'failure';
+    }
+
+    return {
+      successes,
+      ones,
+      tens,
+      net: Math.max(0, netSuccesses),
+      type,
+      difficulty,
+    };
+  }
+
+  function showVampireSummary(result) {
+    $vampireSummary.classList.remove('hidden');
+    $vampireSumVal.className = 'vampire-summary-value ' + result.type;
+    $vampireSumDet.textContent = '';
+
+    if (result.type === 'success') {
+      const plural = result.net === 1 ? 'Sucesso' : 'Sucessos';
+      $vampireSumVal.textContent = `${result.net} ${plural}`;
+      const details = [];
+      if (result.tens > 0) details.push(`${result.tens} especial(is)`);
+      if (result.ones > 0) details.push(`${result.ones} cancelado(s)`);
+      $vampireSumDet.textContent = details.join(' · ');
+    } else if (result.type === 'critical-failure') {
+      $vampireSumVal.textContent = 'Falha Crítica!';
+      $vampireSumDet.textContent = `${result.ones} dado(s) com valor 1`;
+      // Screen shake effect
+      $appLayout.classList.add('screen-shake');
+      setTimeout(() => $appLayout.classList.remove('screen-shake'), 500);
+    } else {
+      $vampireSumVal.textContent = 'Falha';
+      $vampireSumDet.textContent = 'Nenhum sucesso obtido';
+    }
+  }
+
+  // ── Presets / Favorites ────────────────────────────────────────────────
+
+  function showPresetSaveInput() {
+    // Check if inline input already exists
+    if (document.querySelector('.preset-save-inline')) return;
+
+    const container = document.createElement('div');
+    container.className = 'preset-save-inline';
+    container.innerHTML = `
+      <input type="text" class="preset-name-input" placeholder="Nome do favorito..." maxlength="30" autofocus>
+      <button class="preset-confirm-btn" type="button" title="Salvar">✓</button>
+      <button class="preset-cancel-btn" type="button" title="Cancelar">✕</button>
+    `;
+
+    // Insert after pool section
+    const poolSection = document.getElementById('pool-section');
+    poolSection.after(container);
+
+    const input = container.querySelector('.preset-name-input');
+    const confirmBtn = container.querySelector('.preset-confirm-btn');
+    const cancelBtn = container.querySelector('.preset-cancel-btn');
+
+    input.focus();
+
+    const save = () => {
+      const name = input.value.trim();
+      if (!name) { input.focus(); return; }
+      savePreset(name);
+      container.remove();
+    };
+
+    const cancel = () => container.remove();
+
+    confirmBtn.addEventListener('click', save);
+    cancelBtn.addEventListener('click', cancel);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') save();
+      if (e.key === 'Escape') cancel();
+    });
+  }
+
+  function savePreset(name) {
+    const poolSnapshot = {};
+    for (const [type, qty] of dicePool) {
+      poolSnapshot[type] = qty;
+    }
+
+    const preset = {
+      name,
+      pool: poolSnapshot,
+      vampireMode,
+      difficulty,
+    };
+
+    presets.push(preset);
+    if (presets.length > MAX_PRESETS) presets.shift();
+
+    persistPresets();
+    renderPresets();
+  }
+
+  function loadPreset(index) {
+    const preset = presets[index];
+    if (!preset) return;
+
+    // Set vampire mode if preset was saved in vampire mode
+    if (preset.vampireMode !== vampireMode) {
+      vampireMode = preset.vampireMode;
+      $vampireToggle.checked = vampireMode;
+      applyVampireMode();
+    }
+
+    if (preset.difficulty && vampireMode) {
+      difficulty = preset.difficulty;
+      $difficultyValue.textContent = difficulty;
+    }
+
+    // Load dice pool
+    dicePool.clear();
+    for (const [type, qty] of Object.entries(preset.pool)) {
+      if (DICE_TYPES[type]) {
+        dicePool.set(type, qty);
+      }
+    }
+
+    renderPool();
+    updateRollButton();
+  }
+
+  function deletePreset(index) {
+    presets.splice(index, 1);
+    persistPresets();
+    renderPresets();
+  }
+
+  function renderPresets() {
+    $presetsList.innerHTML = '';
+
+    if (presets.length === 0) {
+      $presetsSection.classList.add('hidden');
+      return;
+    }
+
+    $presetsSection.classList.remove('hidden');
+
+    presets.forEach((preset, i) => {
+      const chip = document.createElement('div');
+      chip.className = 'preset-chip';
+      chip.dataset.index = i;
+
+      const diceStr = Object.entries(preset.pool)
+        .map(([type, qty]) => `${qty}${type}`)
+        .join('+');
+
+      const vampireTag = preset.vampireMode ? ' 🦇' : '';
+
+      chip.innerHTML = `
+        <span class="preset-chip-name">${escapeHtml(preset.name)}${vampireTag}</span>
+        <span class="preset-chip-dice">${diceStr}</span>
+        <button class="preset-chip-delete" data-index="${i}" type="button" title="Excluir">✕</button>
+      `;
+
+      $presetsList.appendChild(chip);
+    });
+  }
+
+  function persistPresets() {
+    try {
+      localStorage.setItem(STORAGE_PRESETS, JSON.stringify(presets));
+    } catch (_) {}
+  }
+
+  function loadPresets() {
+    try {
+      const data = localStorage.getItem(STORAGE_PRESETS);
+      if (data) presets = JSON.parse(data);
+    } catch (_) {
+      presets = [];
+    }
+  }
+
   // ── History ────────────────────────────────────────────────────────────
 
-  function saveRoll(results) {
+  function saveRoll(results, vampireResult) {
     const poolSnapshot = {};
     for (const [type, qty] of dicePool) {
       poolSnapshot[type] = qty;
@@ -291,6 +594,14 @@
       pool: poolSnapshot,
       results: results.map(r => ({ type: r.type, value: r.value })),
     };
+
+    if (vampireResult) {
+      entry.vampire = {
+        type: vampireResult.type,
+        net: vampireResult.net,
+        difficulty: vampireResult.difficulty,
+      };
+    }
 
     history.unshift(entry);
     if (history.length > MAX_HISTORY) history.pop();
@@ -326,12 +637,30 @@
 
       const resultsStr = entry.results.map(r => r.value).join(', ');
 
+      let vampireHtml = '';
+      if (entry.vampire) {
+        const v = entry.vampire;
+        let label, cssClass;
+        if (v.type === 'success') {
+          label = `${v.net} sucesso(s)`;
+          cssClass = 'success';
+        } else if (v.type === 'critical-failure') {
+          label = 'Falha Crítica!';
+          cssClass = 'critical-failure';
+        } else {
+          label = 'Falha';
+          cssClass = 'failure';
+        }
+        vampireHtml = `<span class="entry-vampire-result ${cssClass}">${label}</span>`;
+      }
+
       el.innerHTML = `
         <div class="entry-header">
           <span class="entry-dice">${diceStr}</span>
           <span class="entry-time">${timeStr}</span>
         </div>
         <span class="entry-results">${resultsStr}</span>
+        ${vampireHtml}
       `;
 
       $historyList.appendChild(el);
@@ -346,18 +675,14 @@
 
   function persistHistory() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-    } catch (_) {
-      // Storage full or unavailable — fail silently
-    }
+      localStorage.setItem(STORAGE_HISTORY, JSON.stringify(history));
+    } catch (_) {}
   }
 
   function loadHistory() {
     try {
-      const data = localStorage.getItem(STORAGE_KEY);
-      if (data) {
-        history = JSON.parse(data);
-      }
+      const data = localStorage.getItem(STORAGE_HISTORY);
+      if (data) history = JSON.parse(data);
     } catch (_) {
       history = [];
     }
@@ -366,16 +691,8 @@
   // ── Mobile History Panel ───────────────────────────────────────────────
 
   function toggleMobileHistory() {
-    if ($historyPanel.classList.contains('open')) {
-      closeMobileHistory();
-    } else {
-      openMobileHistory();
-    }
-  }
-
-  function openMobileHistory() {
-    $historyPanel.classList.add('open');
-    $mobileToggle.classList.add('active');
+    $historyPanel.classList.toggle('open');
+    $mobileToggle.classList.toggle('active');
   }
 
   function closeMobileHistory() {
@@ -388,19 +705,23 @@
   function createRipple(button, event) {
     const ripple = document.createElement('span');
     ripple.className = 'ripple';
-
     const rect = button.getBoundingClientRect();
     const size = Math.max(rect.width, rect.height);
     ripple.style.width = ripple.style.height = `${size}px`;
     ripple.style.left = `${event.clientX - rect.left - size / 2}px`;
     ripple.style.top = `${event.clientY - rect.top - size / 2}px`;
-
     button.appendChild(ripple);
     ripple.addEventListener('animationend', () => ripple.remove());
   }
 
   function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
   }
 
   // ── Start ──────────────────────────────────────────────────────────────

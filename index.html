@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Rolador de dados com tema gótico. Escolha seus dados, role e veja os resultados com estilo.">
+  <meta name="theme-color" content="#07060b">
+
+  <title>Rolador de Dados</title>
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Atmospheric Background -->
+  <div class="fog-layer" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <!-- App Layout: Two Columns -->
+  <div class="app-layout">
+
+    <!-- LEFT: Main content -->
+    <main class="main-panel">
+
+      <!-- Dice Selector -->
+      <section class="section" id="dice-selector-section">
+        <h1 class="section-title">Escolha seus dados</h1>
+        <div class="dice-grid" id="dice-grid">
+          <button class="dice-btn" data-die="d4" id="btn-d4" type="button" aria-label="Adicionar dado d4">
+            <span class="dice-icon">◆</span>
+            <span class="dice-label">d4</span>
+          </button>
+          <button class="dice-btn" data-die="d6" id="btn-d6" type="button" aria-label="Adicionar dado d6">
+            <span class="dice-icon">⬡</span>
+            <span class="dice-label">d6</span>
+          </button>
+          <button class="dice-btn" data-die="d8" id="btn-d8" type="button" aria-label="Adicionar dado d8">
+            <span class="dice-icon">◈</span>
+            <span class="dice-label">d8</span>
+          </button>
+          <button class="dice-btn" data-die="d10" id="btn-d10" type="button" aria-label="Adicionar dado d10">
+            <span class="dice-icon">⬟</span>
+            <span class="dice-label">d10</span>
+          </button>
+          <button class="dice-btn" data-die="d12" id="btn-d12" type="button" aria-label="Adicionar dado d12">
+            <span class="dice-icon">⬠</span>
+            <span class="dice-label">d12</span>
+          </button>
+          <button class="dice-btn" data-die="d20" id="btn-d20" type="button" aria-label="Adicionar dado d20">
+            <span class="dice-icon">⏣</span>
+            <span class="dice-label">d20</span>
+          </button>
+          <button class="dice-btn" data-die="d100" id="btn-d100" type="button" aria-label="Adicionar dado d100">
+            <span class="dice-icon">◉</span>
+            <span class="dice-label">d100</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Dice Pool -->
+      <section class="section" id="pool-section">
+        <h2 class="section-title">Seus dados</h2>
+        <div class="dice-pool" id="dice-pool">
+          <div class="dice-pool-empty" id="pool-empty">
+            Toque em um dado acima para adicioná-lo
+          </div>
+        </div>
+      </section>
+
+      <!-- Roll Button -->
+      <div class="roll-section">
+        <button class="roll-btn" id="roll-btn" type="button" disabled>
+          Rolar
+        </button>
+      </div>
+
+      <!-- Results -->
+      <section class="section results-section" id="results-section">
+        <h2 class="section-title results-title hidden" id="results-title">Resultados</h2>
+        <div class="results-grid" id="results-grid"></div>
+      </section>
+
+    </main>
+
+    <!-- RIGHT: History panel -->
+    <aside class="history-panel" id="history-panel">
+      <div class="history-panel-header">
+        <h2 class="section-title">Histórico</h2>
+        <button class="history-clear hidden" id="history-clear" type="button">
+          Limpar
+        </button>
+      </div>
+      <div class="history-list" id="history-list">
+        <div class="history-empty" id="history-empty">
+          Nenhuma rolagem ainda
+        </div>
+      </div>
+
+      <!-- Mobile toggle -->
+      <button class="history-mobile-toggle" id="history-mobile-toggle" type="button" aria-label="Abrir histórico">
+        <span class="toggle-icon">📜</span>
+      </button>
+    </aside>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

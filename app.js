@@ -16,7 +16,7 @@
     d100: { sides: 100, icon: '◉', label: 'd100' }
   };
   const MAX_DICE = 100, MAX_HIST = 100, MAX_PRE = 20, ROLL_DUR = 600;
-  const K_HIST = 'dice-roller-history', K_PRE = 'dice-roller-presets';
+  const K_HIST = 'dice-roller-history', K_PRE = 'dice-roller-presets', K_COLLAPSED = 'dice-roller-history-collapsed';
 
   // ── Estado ────────────────────────────────────────────────────────────────
   const dicePool = new Map();
@@ -36,6 +36,8 @@
   const $vampireBar    = $('vampire-mode-bar');
   const $diffGroup     = $('difficulty-group');
   const $diffValue     = $('difficulty-value');
+  const $diffDown      = $('diff-down');
+  const $diffUp        = $('diff-up');
   const $diffControls  = document.querySelector('.difficulty-controls');
   const $vampireSum    = $('vampire-summary');
   const $vampireVal    = $('vampire-summary-value');
@@ -47,28 +49,47 @@
   const $presetsList   = $('presets-list');
   const $historyClear  = $('history-clear');
   const $historyList   = $('history-list');
-  const $historyPanel  = $('history-panel');
-  const $mobileToggle  = $('history-mobile-toggle');
+  const $historyPanel    = $('history-panel');
+  const $mobileToggle    = $('history-mobile-toggle');
+  const $historyCloseBtn = $('history-close-btn');
+  const $historyBackdrop = $('history-backdrop');
 
-  // ── Helper de Storage ─────────────────────────────────────────────────────
-  const storage = (key, val) => {
-    try {
-      if (val !== undefined) {
-        localStorage.setItem(key, JSON.stringify(val));
-        return;
+  // ── Helper de Storage Unificado ───────────────────────────────────────────
+  const storage = {
+    get: (key, fallback = null) => {
+      try {
+        const item = localStorage.getItem(key);
+        if (item === null) return fallback;
+        try {
+          return JSON.parse(item);
+        } catch (_) {
+          return item;
+        }
+      } catch (_) {
+        return fallback;
       }
-      const parsed = JSON.parse(localStorage.getItem(key) || '[]');
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (_) { return []; }
+    },
+    set: (key, val) => {
+      try {
+        const toStore = typeof val === 'object' ? JSON.stringify(val) : String(val);
+        localStorage.setItem(key, toStore);
+      } catch (_) { /* noop */ }
+    }
   };
 
   // ── Inicialização e Eventos ───────────────────────────────────────────────
   function init() {
-    history = storage(K_HIST);
-    presets = storage(K_PRE);
+    history = storage.get(K_HIST, []);
+    presets = storage.get(K_PRE, []);
+    $vampireToggle.checked = false;
+    vampireMode = false;
     renderHistory();
     renderPresets();
+    updateDifficultyControls();
     bindEvents();
+    if (storage.get(K_COLLAPSED) === 'true' && !isMobile()) {
+      collapseDesktopHistory(true);
+    }
   }
 
   function bindEvents() {
@@ -110,10 +131,11 @@
       applyVampireMode();
     });
 
-    $('diff-up').addEventListener('click', () => setDifficulty(difficulty + 1));
-    $('diff-down').addEventListener('click', () => setDifficulty(difficulty - 1));
+    if ($diffUp) $diffUp.addEventListener('click', () => { if (!isRolling) setDifficulty(difficulty + 1); });
+    if ($diffDown) $diffDown.addEventListener('click', () => { if (!isRolling) setDifficulty(difficulty - 1); });
 
     $savePresetBtn.addEventListener('click', () => {
+      if (isRolling) return;
       $presetBox.classList.remove('hidden');
       $presetInput.value = '';
       $presetInput.focus();
@@ -138,15 +160,32 @@
     });
 
     $historyClear.addEventListener('click', () => {
+      if (isRolling) return;
       history = [];
-      storage(K_HIST, history);
+      storage.set(K_HIST, history);
       renderHistory();
     });
 
-    $mobileToggle.addEventListener('click', toggleMobileHistory);
+    $mobileToggle.addEventListener('click', toggleHistory);
+    if ($historyCloseBtn) $historyCloseBtn.addEventListener('click', closeHistory);
+    if ($historyBackdrop) {
+      $historyBackdrop.addEventListener('click', e => {
+        e.stopPropagation();
+        closeMobileHistory();
+      });
+    }
     document.addEventListener('click', e => {
       if ($historyPanel.classList.contains('open') && !$historyPanel.contains(e.target) && !$mobileToggle.contains(e.target)) {
         closeMobileHistory();
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (isMobile()) {
+        $mobileToggle.classList.remove('desktop-visible');
+      } else {
+        closeMobileHistory();
+        $mobileToggle.classList.toggle('desktop-visible', storage.get(K_COLLAPSED) === 'true');
       }
     });
   }
@@ -156,7 +195,12 @@
     if (val < 2 || val > 10) return;
     difficulty = val;
     $diffValue.textContent = difficulty;
-    if ($diffControls) $diffControls.setAttribute('aria-valuenow', difficulty);
+    updateDifficultyControls();
+  }
+
+  function updateDifficultyControls() {
+    if ($diffDown) $diffDown.disabled = isRolling || difficulty <= 2;
+    if ($diffUp) $diffUp.disabled = isRolling || difficulty >= 10;
   }
 
   function applyVampireMode() {
@@ -258,10 +302,13 @@
   async function rollAllDice() {
     if (isRolling || dicePool.size === 0) return;
     isRolling = true;
+    let activeIntervals = [];
     try {
       $rollBtn.classList.add('rolling');
       $rollBtn.disabled = true;
       $vampireToggle.disabled = true;
+      updateDifficultyControls();
+      $dicePool.querySelectorAll('.qty-input, .qty-btn, .remove-btn').forEach(el => { el.disabled = true; });
       clearResults();
       $resultsTitle.classList.remove('hidden');
 
@@ -279,13 +326,16 @@
         $resultsGrid.appendChild(el);
         const valEl = el.querySelector('.result-value');
         const intervalId = setInterval(() => { valEl.textContent = Math.floor(Math.random() * die.sides) + 1; }, 50);
-        return { el, die, valEl, intervalId };
+        activeIntervals.push(intervalId);
+        return { el, die, valEl };
       });
 
       await new Promise(res => setTimeout(res, ROLL_DUR));
 
-      const results = resultEls.map(({ el, die, valEl, intervalId }) => {
-        clearInterval(intervalId);
+      activeIntervals.forEach(clearInterval);
+      activeIntervals = [];
+
+      const results = resultEls.map(({ el, die, valEl }) => {
         const value = rollDie(die.sides);
         valEl.textContent = value;
         el.classList.remove('rolling-anim');
@@ -305,10 +355,14 @@
       if (vampireResult) showVampireSummary(vampireResult);
       saveRoll(results, vampireResult);
     } finally {
+      activeIntervals.forEach(clearInterval);
+      activeIntervals = [];
       $rollBtn.classList.remove('rolling');
       $rollBtn.disabled = dicePool.size === 0;
       $vampireToggle.disabled = false;
+      $dicePool.querySelectorAll('.qty-input, .qty-btn, .remove-btn').forEach(el => { el.disabled = false; });
       isRolling = false;
+      updateDifficultyControls();
     }
   }
 
@@ -353,6 +407,16 @@
     }
   }
 
+  // ── Helper de Formatação do Pool ─────────────────────────────────────────
+  function formatPool(pool, vampireInfo = null) {
+    const parts = Object.entries(pool).map(([t, q]) => `${q}${t}`);
+    const base = parts.join(' + ');
+    if (vampireInfo && vampireInfo.difficulty) {
+      return `${base} (Dif. ${vampireInfo.difficulty})`;
+    }
+    return base;
+  }
+
   // ── Favoritos (Presets) ───────────────────────────────────────────────────
   function handleSavePreset() {
     const name = $presetInput.value.trim();
@@ -364,7 +428,7 @@
 
     presets.push(preset);
     if (presets.length > MAX_PRE) presets.shift();
-    storage(K_PRE, presets);
+    storage.set(K_PRE, presets);
     renderPresets();
     $presetBox.classList.add('hidden');
   }
@@ -374,11 +438,18 @@
     if (!p) return;
     clearResults();
 
-    if (p.vampireMode !== vampireMode) {
-      vampireMode = p.vampireMode;
-      $vampireToggle.checked = vampireMode;
-      applyVampireMode();
+    const modeChanged = p.vampireMode !== vampireMode;
+    vampireMode = !!p.vampireMode;
+    $vampireToggle.checked = vampireMode;
+
+    if (modeChanged) {
+      $vampireBar.classList.toggle('active', vampireMode);
+      $diffGroup.classList.toggle('hidden', !vampireMode);
+      document.querySelectorAll('.dice-btn').forEach(btn => {
+        if (btn.dataset.die !== 'd10') btn.classList.toggle('disabled-vampire', vampireMode);
+      });
     }
+
     if (vampireMode) setDifficulty(p.difficulty || 6);
 
     dicePool.clear();
@@ -390,7 +461,7 @@
 
   function deletePreset(idx) {
     presets.splice(idx, 1);
-    storage(K_PRE, presets);
+    storage.set(K_PRE, presets);
     renderPresets();
   }
 
@@ -401,7 +472,8 @@
       const chip = document.createElement('div');
       chip.className = 'preset-chip';
       chip.dataset.index = i;
-      const diceStr = Object.entries(p.pool).map(([t, q]) => `${q}${t}`).join('+');
+      const vInfo = p.vampireMode ? { difficulty: p.difficulty || 6 } : null;
+      const diceStr = formatPool(p.pool, vInfo);
       chip.innerHTML = `
         <span class="preset-chip-name">${escapeHtml(p.name)}${p.vampireMode ? ' 🦇' : ''}</span>
         <span class="preset-chip-dice">${diceStr}</span>
@@ -412,12 +484,46 @@
   }
 
   // ── Histórico ─────────────────────────────────────────────────────────────
+  function createHistoryElement(entry, animate = false) {
+    const el = document.createElement('div');
+    el.className = 'history-entry' + (animate ? ' history-entry-enter' : '');
+    const timeStr = new Date(entry.timestamp).toLocaleTimeString('pt-BR');
+    const diceStr = formatPool(entry.pool);
+    const resultsStr = entry.results.map(r => r.value).join(', ');
+
+    let vHtml = '';
+    if (entry.vampire) {
+      const v = entry.vampire, diff = v.difficulty ? ` · Dif. ${v.difficulty}` : '';
+      const count = v.net;
+      const successLabel = count === 1 ? 'sucesso' : 'sucessos';
+      const txt = v.type === 'success' ? `${count} ${successLabel}${diff}` : (v.type === 'critical-failure' ? `Falha Crítica!${diff}` : `Falha${diff}`);
+      vHtml = `<span class="entry-vampire-result ${v.type}">${txt}</span>`;
+    }
+
+    el.innerHTML = `
+      <div class="entry-header"><span class="entry-dice">${diceStr}</span><span class="entry-time">${timeStr}</span></div>
+      <span class="entry-results">${resultsStr}</span>${vHtml}
+    `;
+    return el;
+  }
+
   function saveRoll(results, vampire) {
     const pool = Object.fromEntries(dicePool);
-    history.unshift({ timestamp: Date.now(), pool, results, vampire });
+    const entry = { timestamp: Date.now(), pool, results, vampire };
+    history.unshift(entry);
     if (history.length > MAX_HIST) history.pop();
-    storage(K_HIST, history);
-    renderHistory();
+    storage.set(K_HIST, history);
+
+    const emptyEl = $historyList.querySelector('.history-empty');
+    if (emptyEl) emptyEl.remove();
+    $historyClear.classList.remove('hidden');
+
+    const el = createHistoryElement(entry, true);
+    $historyList.prepend(el);
+
+    while ($historyList.children.length > MAX_HIST) {
+      $historyList.lastElementChild.remove();
+    }
   }
 
   function renderHistory() {
@@ -429,38 +535,53 @@
     }
 
     history.forEach(entry => {
-      const el = document.createElement('div');
-      el.className = 'history-entry';
-      const timeStr = new Date(entry.timestamp).toLocaleTimeString('pt-BR');
-      const diceStr = Object.entries(entry.pool).map(([t, q]) => `${q}${t}`).join(' + ');
-      const resultsStr = entry.results.map(r => r.value).join(', ');
-
-      let vHtml = '';
-      if (entry.vampire) {
-        const v = entry.vampire, diff = v.difficulty ? ` · Dif. ${v.difficulty}` : '';
-        const txt = v.type === 'success' ? `${v.net} sucesso(s)${diff}` : (v.type === 'critical-failure' ? `Falha Crítica!${diff}` : `Falha${diff}`);
-        vHtml = `<span class="entry-vampire-result ${v.type}">${txt}</span>`;
-      }
-
-      el.innerHTML = `
-        <div class="entry-header"><span class="entry-dice">${diceStr}</span><span class="entry-time">${timeStr}</span></div>
-        <span class="entry-results">${resultsStr}</span>${vHtml}
-      `;
-      $historyList.appendChild(el);
+      $historyList.appendChild(createHistoryElement(entry, false));
     });
   }
 
   // ── UI Helpers ────────────────────────────────────────────────────────────
+  function isMobile() {
+    return window.innerWidth <= 768;
+  }
+
+  function toggleHistory(e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if ($historyPanel.classList.contains('open')) {
+      closeMobileHistory();
+    } else if (isMobile()) {
+      toggleMobileHistory();
+    } else {
+      const isCollapsed = $historyPanel.classList.contains('collapsed');
+      collapseDesktopHistory(!isCollapsed);
+    }
+  }
+
+  function closeHistory(e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    closeMobileHistory();
+    if (!isMobile()) {
+      collapseDesktopHistory(true);
+    }
+  }
+
+  function collapseDesktopHistory(collapse) {
+    $historyPanel.classList.toggle('collapsed', collapse);
+    $mobileToggle.classList.toggle('desktop-visible', collapse);
+    storage.set(K_COLLAPSED, collapse);
+  }
+
   function toggleMobileHistory() {
     const open = $historyPanel.classList.toggle('open');
     $mobileToggle.classList.toggle('active', open);
     $mobileToggle.setAttribute('aria-label', open ? 'Fechar histórico' : 'Abrir histórico');
+    if ($historyBackdrop) $historyBackdrop.classList.toggle('open', open);
   }
 
   function closeMobileHistory() {
     $historyPanel.classList.remove('open');
     $mobileToggle.classList.remove('active');
     $mobileToggle.setAttribute('aria-label', 'Abrir histórico');
+    if ($historyBackdrop) $historyBackdrop.classList.remove('open');
   }
 
   function escapeHtml(str) {

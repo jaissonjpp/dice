@@ -25,21 +25,22 @@
 
     <!-- LEFT: Main content -->
     <main class="main-panel">
+      <h1 class="sr-only">Rolador de Dados</h1>
 
       <!-- Vampire Mode Toggle -->
       <section class="vampire-mode-bar" id="vampire-mode-bar">
         <div class="vampire-toggle-group">
-          <label class="toggle-switch" for="vampire-toggle">
-            <input type="checkbox" id="vampire-toggle">
-            <span class="toggle-slider"></span>
-          </label>
-          <label for="vampire-toggle" class="vampire-toggle-label">Modo Vampiro</label>
+          <span class="toggle-switch">
+            <input type="checkbox" id="vampire-toggle" aria-labelledby="vampire-toggle-label">
+            <span class="toggle-slider" aria-hidden="true"></span>
+          </span>
+          <label for="vampire-toggle" class="vampire-toggle-label" id="vampire-toggle-label">Modo Vampiro</label>
         </div>
         <div class="difficulty-group hidden" id="difficulty-group">
           <span class="difficulty-label" id="difficulty-label">Dificuldade</span>
-          <div class="difficulty-controls" role="spinbutton" aria-labelledby="difficulty-label" aria-valuenow="6" aria-valuemin="2" aria-valuemax="10">
+          <div class="difficulty-controls" role="group" aria-labelledby="difficulty-label">
             <button class="diff-btn" id="diff-down" type="button" aria-label="Diminuir dificuldade">−</button>
-            <span class="difficulty-value" id="difficulty-value">6</span>
+            <span class="difficulty-value" id="difficulty-value" aria-live="polite">6</span>
             <button class="diff-btn" id="diff-up" type="button" aria-label="Aumentar dificuldade">+</button>
           </div>
         </div>
@@ -47,7 +48,7 @@
 
       <!-- Dice Selector -->
       <section class="section">
-        <h1 class="section-title">Escolha seus dados</h1>
+        <h2 class="section-title">Escolha seus dados</h2>
         <div class="dice-grid" id="dice-grid">
           <button class="dice-btn" data-die="d4" type="button" aria-label="Adicionar dado d4">
             <span class="dice-icon">◆</span>
@@ -132,21 +133,29 @@
     <aside class="history-panel" id="history-panel">
       <div class="history-panel-header">
         <h2 class="section-title">Histórico</h2>
-        <button class="history-clear hidden" id="history-clear" type="button">
-          Limpar
-        </button>
+        <div class="history-header-actions">
+          <button class="history-clear hidden" id="history-clear" type="button">
+            Limpar
+          </button>
+          <button class="history-close-btn" id="history-close-btn" type="button" title="Recolher histórico" aria-label="Recolher histórico">
+            ✕
+          </button>
+        </div>
       </div>
       <div class="history-list" id="history-list">
         <div class="history-empty" id="history-empty">
           Nenhuma rolagem ainda
         </div>
       </div>
-
-      <!-- Mobile toggle -->
-      <button class="history-mobile-toggle" id="history-mobile-toggle" type="button" aria-label="Abrir histórico">
-        <span class="toggle-icon">📜</span>
-      </button>
     </aside>
+
+    <!-- Mobile floating toggle -->
+    <button class="history-mobile-toggle" id="history-mobile-toggle" type="button" aria-label="Abrir histórico">
+      <span aria-hidden="true">📜</span>
+    </button>
+
+    <!-- Mobile backdrop -->
+    <div class="history-backdrop" id="history-backdrop" aria-hidden="true"></div>
 
   </div>
 

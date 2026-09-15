@@ -11,7 +11,7 @@
 
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦇</text></svg>">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
@@ -46,34 +46,34 @@
       </section>
 
       <!-- Dice Selector -->
-      <section class="section" id="dice-selector-section">
+      <section class="section">
         <h1 class="section-title">Escolha seus dados</h1>
         <div class="dice-grid" id="dice-grid">
-          <button class="dice-btn" data-die="d4" id="btn-d4" type="button" aria-label="Adicionar dado d4">
+          <button class="dice-btn" data-die="d4" type="button" aria-label="Adicionar dado d4">
             <span class="dice-icon">◆</span>
             <span class="dice-label">d4</span>
           </button>
-          <button class="dice-btn" data-die="d6" id="btn-d6" type="button" aria-label="Adicionar dado d6">
+          <button class="dice-btn" data-die="d6" type="button" aria-label="Adicionar dado d6">
             <span class="dice-icon">⬡</span>
             <span class="dice-label">d6</span>
           </button>
-          <button class="dice-btn" data-die="d8" id="btn-d8" type="button" aria-label="Adicionar dado d8">
+          <button class="dice-btn" data-die="d8" type="button" aria-label="Adicionar dado d8">
             <span class="dice-icon">◈</span>
             <span class="dice-label">d8</span>
           </button>
-          <button class="dice-btn" data-die="d10" id="btn-d10" type="button" aria-label="Adicionar dado d10">
+          <button class="dice-btn" data-die="d10" type="button" aria-label="Adicionar dado d10">
             <span class="dice-icon">⬟</span>
             <span class="dice-label">d10</span>
           </button>
-          <button class="dice-btn" data-die="d12" id="btn-d12" type="button" aria-label="Adicionar dado d12">
+          <button class="dice-btn" data-die="d12" type="button" aria-label="Adicionar dado d12">
             <span class="dice-icon">⬠</span>
             <span class="dice-label">d12</span>
           </button>
-          <button class="dice-btn" data-die="d20" id="btn-d20" type="button" aria-label="Adicionar dado d20">
+          <button class="dice-btn" data-die="d20" type="button" aria-label="Adicionar dado d20">
             <span class="dice-icon">⏣</span>
             <span class="dice-label">d20</span>
           </button>
-          <button class="dice-btn" data-die="d100" id="btn-d100" type="button" aria-label="Adicionar dado d100">
+          <button class="dice-btn" data-die="d100" type="button" aria-label="Adicionar dado d100">
             <span class="dice-icon">◉</span>
             <span class="dice-label">d100</span>
           </button>
@@ -81,7 +81,7 @@
       </section>
 
       <!-- Dice Pool -->
-      <section class="section" id="pool-section">
+      <section class="section">
         <div class="pool-header">
           <h2 class="section-title">Seus dados</h2>
           <button class="save-preset-btn hidden" id="save-preset-btn" type="button" title="Salvar como favorito">
@@ -116,7 +116,7 @@
       </div>
 
       <!-- Results -->
-      <section class="section results-section" id="results-section">
+      <section class="section results-section">
         <h2 class="section-title results-title hidden" id="results-title">Resultados</h2>
         <div class="results-grid" id="results-grid"></div>
         <!-- Vampire Mode summary (successes/failures) -->
@@ -150,12 +150,7 @@
 
   </div>
 
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(r => r.forEach(reg => reg.unregister()));
-    }
-  </script>
-  <script src="app.js?v=3"></script>
+  <script src="app.js"></script>
 </body>
 
 </html>

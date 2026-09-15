@@ -15,7 +15,7 @@
     d20:  { sides: 20,  icon: '⏣', label: 'd20' },
     d100: { sides: 100, icon: '◉', label: 'd100' }
   };
-  const MAX_DICE = 20, MAX_HIST = 100, MAX_PRE = 20, ROLL_DUR = 600;
+  const MAX_DICE = 100, MAX_HIST = 100, MAX_PRE = 20, ROLL_DUR = 600;
   const K_HIST = 'dice-roller-history', K_PRE = 'dice-roller-presets';
 
   // ── Estado ────────────────────────────────────────────────────────────────
@@ -53,7 +53,10 @@
   // ── Helper de Storage ─────────────────────────────────────────────────────
   const storage = (key, val) => {
     try {
-      if (val !== undefined) return localStorage.setItem(key, JSON.stringify(val));
+      if (val !== undefined) {
+        localStorage.setItem(key, JSON.stringify(val));
+        return;
+      }
       const parsed = JSON.parse(localStorage.getItem(key) || '[]');
       return Array.isArray(parsed) ? parsed : [];
     } catch (_) { return []; }
@@ -72,19 +75,33 @@
     $diceGrid.addEventListener('click', e => {
       const btn = e.target.closest('.dice-btn');
       if (!btn || isRolling || btn.classList.contains('disabled-vampire')) return;
-      updateDie(btn.dataset.die, 1);
+      const step = e.shiftKey ? 5 : 1;
+      updateDie(btn.dataset.die, step);
     });
 
-    $rollBtn.addEventListener('click', () => !isRolling && dicePool.size > 0 && rollAllDice());
+    $rollBtn.addEventListener('click', rollAllDice);
 
     $dicePool.addEventListener('click', e => {
       if (isRolling) return;
       const target = e.target.closest('[data-action]');
       if (!target) return;
       const { die, action } = target.dataset;
-      if (action === 'increment') updateDie(die, 1);
-      else if (action === 'decrement') updateDie(die, -1);
+      const step = e.shiftKey ? 5 : 1;
+      if (action === 'increment') updateDie(die, step);
+      else if (action === 'decrement') updateDie(die, -step);
       else if (action === 'remove') updateDie(die, null);
+    });
+
+    $dicePool.addEventListener('change', e => {
+      if (!isRolling && e.target.classList.contains('qty-input')) {
+        setDieQty(e.target.dataset.die, e.target.value);
+      }
+    });
+
+    $dicePool.addEventListener('keydown', e => {
+      if (e.target.classList.contains('qty-input') && e.key === 'Enter') {
+        e.target.blur();
+      }
     });
 
     $vampireToggle.addEventListener('change', () => {
@@ -163,15 +180,20 @@
   }
 
   // ── Gerenciamento do Pool de Dados ────────────────────────────────────────
-  function updateDie(type, delta) {
+  function setDieQty(type, qty) {
     if (!DICE_TYPES[type] || (vampireMode && type !== 'd10')) return;
-    const current = dicePool.get(type) || 0;
-    if (delta === null || current + delta <= 0) {
+    const val = parseInt(qty, 10);
+    if (isNaN(val) || val <= 0) {
       dicePool.delete(type);
     } else {
-      dicePool.set(type, Math.min(MAX_DICE, current + delta));
+      dicePool.set(type, Math.min(MAX_DICE, Math.max(1, val)));
     }
     renderPool();
+  }
+
+  function updateDie(type, delta) {
+    if (delta === null) setDieQty(type, 0);
+    else setDieQty(type, (dicePool.get(type) || 0) + delta);
   }
 
   function renderPool() {
@@ -181,25 +203,40 @@
     if (empty) $presetBox.classList.add('hidden');
     $rollBtn.disabled = empty;
 
-    $dicePool.querySelectorAll('.pool-item').forEach(el => el.remove());
+    // Remove elementos que não estão mais no pool
+    $dicePool.querySelectorAll('.pool-item').forEach(el => {
+      if (!dicePool.has(el.dataset.die)) el.remove();
+    });
+
     if (empty) return;
 
     Object.keys(DICE_TYPES).filter(t => dicePool.has(t)).forEach(type => {
       const qty = dicePool.get(type), info = DICE_TYPES[type];
-      const el = document.createElement('div');
-      el.className = 'pool-item';
-      el.dataset.die = type;
-      el.innerHTML = `
-        <span class="pool-item-icon">${info.icon}</span>
-        <span class="pool-item-name">${qty}× ${info.label}</span>
-        <div class="pool-item-controls">
-          <button class="qty-btn" data-action="decrement" data-die="${type}" type="button" aria-label="Diminuir ${info.label}">−</button>
-          <span class="qty-value">${qty}</span>
-          <button class="qty-btn" data-action="increment" data-die="${type}" type="button" aria-label="Aumentar ${info.label}">+</button>
-        </div>
-        <button class="remove-btn" data-action="remove" data-die="${type}" type="button" aria-label="Remover ${info.label}">✕</button>
-      `;
-      $dicePool.appendChild(el);
+      let el = $dicePool.querySelector(`.pool-item[data-die="${type}"]`);
+
+      if (el) {
+        // Atualiza elemento existente sem reiniciar animação
+        const nameEl = el.querySelector('.pool-item-name');
+        const inputEl = el.querySelector('.qty-input');
+        if (nameEl) nameEl.textContent = `${qty}× ${info.label}`;
+        if (inputEl && document.activeElement !== inputEl) inputEl.value = qty;
+      } else {
+        // Novo elemento: adiciona animação apenas de entrada inicial
+        el = document.createElement('div');
+        el.className = 'pool-item pool-item-enter';
+        el.dataset.die = type;
+        el.innerHTML = `
+          <span class="pool-item-icon">${info.icon}</span>
+          <span class="pool-item-name">${qty}× ${info.label}</span>
+          <div class="pool-item-controls">
+            <button class="qty-btn" data-action="decrement" data-die="${type}" type="button" aria-label="Diminuir ${info.label}">−</button>
+            <input type="number" class="qty-input" data-die="${type}" min="1" max="${MAX_DICE}" value="${qty}" aria-label="Quantidade de ${info.label}" title="Clique para digitar a quantidade">
+            <button class="qty-btn" data-action="increment" data-die="${type}" type="button" aria-label="Aumentar ${info.label}">+</button>
+          </div>
+          <button class="remove-btn" data-action="remove" data-die="${type}" type="button" aria-label="Remover ${info.label}">✕</button>
+        `;
+        $dicePool.appendChild(el);
+      }
     });
   }
 
@@ -233,26 +270,24 @@
         for (let i = 0; i < qty; i++) diceToRoll.push({ type, sides: DICE_TYPES[type].sides });
       }
 
+      const delayStep = diceToRoll.length > 20 ? Math.max(4, 350 / diceToRoll.length) : 50;
       const resultEls = diceToRoll.map((die, idx) => {
         const el = document.createElement('div');
         el.className = 'result-die rolling-anim';
-        el.style.animationDelay = `${idx * 60}ms`;
+        el.style.animationDelay = `${Math.min(idx * delayStep, 350)}ms`;
         el.innerHTML = `<span class="result-value">?</span><span class="result-type">${die.type}</span>`;
         $resultsGrid.appendChild(el);
-        return { el, die };
-      });
-
-      const intervals = resultEls.map(({ el, die }) => {
         const valEl = el.querySelector('.result-value');
-        return setInterval(() => { valEl.textContent = Math.floor(Math.random() * die.sides) + 1; }, 50);
+        const intervalId = setInterval(() => { valEl.textContent = Math.floor(Math.random() * die.sides) + 1; }, 50);
+        return { el, die, valEl, intervalId };
       });
 
       await new Promise(res => setTimeout(res, ROLL_DUR));
 
-      const results = resultEls.map(({ el, die }, i) => {
-        clearInterval(intervals[i]);
+      const results = resultEls.map(({ el, die, valEl, intervalId }) => {
+        clearInterval(intervalId);
         const value = rollDie(die.sides);
-        el.querySelector('.result-value').textContent = value;
+        valEl.textContent = value;
         el.classList.remove('rolling-anim');
 
         if (vampireMode) {
@@ -322,8 +357,7 @@
   function handleSavePreset() {
     const name = $presetInput.value.trim();
     if (!name) return $presetInput.focus();
-    const pool = {};
-    for (const [type, qty] of dicePool) pool[type] = qty;
+    const pool = Object.fromEntries(dicePool);
 
     const preset = { name, pool, vampireMode };
     if (vampireMode) preset.difficulty = difficulty;
@@ -379,8 +413,7 @@
 
   // ── Histórico ─────────────────────────────────────────────────────────────
   function saveRoll(results, vampire) {
-    const pool = {};
-    for (const [t, q] of dicePool) pool[t] = q;
+    const pool = Object.fromEntries(dicePool);
     history.unshift({ timestamp: Date.now(), pool, results, vampire });
     if (history.length > MAX_HIST) history.pop();
     storage(K_HIST, history);
@@ -429,7 +462,6 @@
     $mobileToggle.classList.remove('active');
     $mobileToggle.setAttribute('aria-label', 'Abrir histórico');
   }
-
 
   function escapeHtml(str) {
     const d = document.createElement('div');
